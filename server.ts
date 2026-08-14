@@ -11,6 +11,14 @@ async function startServer() {
 
   app.use(express.json());
 
+  app.use((req, res, next) => {
+    const startedAt = Date.now();
+    res.on('finish', () => {
+      console.log(`[server] ${req.method} ${req.originalUrl} -> ${res.statusCode} (${Date.now() - startedAt}ms)`);
+    });
+    next();
+  });
+
   registerRoutes(app);
 
   // Chat API endpoint for Driver Logistics & Rescheduling Assistant
@@ -89,6 +97,14 @@ async function startServer() {
       console.error('Chat error:', err);
       return res.status(500).json({ error: 'Failed to process chat message', details: err.message });
     }
+  });
+
+  // Catch unmatched /api/* requests explicitly and log them — otherwise they'd
+  // fall through to the SPA catch-all below and silently return index.html
+  // (200 OK) instead of a 404, hiding a missing/misspelled route.
+  app.use('/api', (req, res) => {
+    console.warn(`[server] 404 — no API route matched ${req.method} ${req.originalUrl}`);
+    res.status(404).json({ error: `No API route for ${req.method} ${req.originalUrl}` });
   });
 
   // Vite middleware setup
