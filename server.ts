@@ -1,9 +1,9 @@
 import 'dotenv/config';
 import express from 'express';
 import path from 'path';
-import { GoogleGenAI } from '@google/genai';
 import { createServer as createViteServer } from 'vite';
 import { registerRoutes } from './server/routes';
+import { getBedrockAgentCoreClient, invokeAgentCore, extractAgentReplyText } from './server/bedrockAgentCore';
 
 async function startServer() {
   const app = express();
@@ -13,86 +13,29 @@ async function startServer() {
 
   registerRoutes(app);
 
-  // Server-side Gemini Client
-  const getGeminiClient = () => {
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) return null;
-    return new GoogleGenAI({
-      apiKey,
-      httpOptions: {
-        headers: {
-          'User-Agent': 'aistudio-build',
-        },
-      },
-    });
-  };
-
   // Chat API endpoint for Driver Logistics & Rescheduling Assistant
   app.post('/api/chat', async (req, res) => {
     try {
       const { message, history, activeShipment, driverProfile } = req.body;
 
-      const ai = getGeminiClient();
-
-      if (ai) {
-        const systemInstruction = `You are FleetPulse AI Dispatcher & Driver Assistant, a helpful voice and text co-pilot for commercial truck drivers.
-Your goal is to assist driver ${driverProfile?.name || 'Driver'} (ID: ${driverProfile?.id || 'DRV-101'}) on the road.
-
-Current Active Shipment context:
-${
-  activeShipment
-    ? `- Shipment ID: ${activeShipment.id}
-- Status: ${activeShipment.status}
-- Cargo: ${activeShipment.productClass}
-- Origin: ${activeShipment.originLabel}
-- Destination: ${activeShipment.destinationFacility?.name} in ${activeShipment.destinationFacility?.city}
-- Planned ETA: ${activeShipment.latestEtaUpdate?.declaredEta || activeShipment.plannedEta}`
-    : 'No active shipment currently assigned.'
-}
-
-Instructions:
-1. Provide concise, professional, driver-friendly advice tailored for logistics, route safety, dock protocols, and rescheduling.
-2. If the driver indicates an issue, delay, traffic, mechanical breakdown, or explicitly requests to RESCHEDULE a pickup or delivery, guide them clearly and provide a suggested action card format at the end of your text response in JSON format.
-3. If they ask for rescheduling or logging an issue, include a special JSON block at the very end of your response inside triple backticks like:
-\`\`\`action
-{
-  "actionType": "RESCHEDULE_OR_ISSUE",
-  "category": "traffic_delay" | "breakdown" | "late_departure" | "accident" | "other",
-  "title": "Short title like 'Delivery Reschedule Request'",
-  "description": "Detailed description of the issue or new requested time",
-  "estimatedDelayMinutes": 45,
-  "suggestedNewEta": "e.g. Today 06:30 PM (+45m)"
-}
-\`\`\`
-The "category" value MUST be exactly one of: traffic_delay, breakdown, late_departure, accident, other — these are the only categories the dispatch system can record. Only include the \`\`\`action block if the driver wants to log an issue or reschedule. Keep conversational tone friendly, brief, and clear.`;
-
-        const contents = [];
-        if (Array.isArray(history)) {
-          for (const item of history) {
-            contents.push({
-              role: item.role === 'user' ? 'user' : 'model',
-              parts: [{ text: item.text }],
-            });
+      const bedrockClient = getBedrockAgentCoreClient();
+      if (bedrockClient) {
+        try {
+          // Confirmed via smoke test: the agent requires a top-level `prompt`
+          // string; the other fields are extra context it opportunistically
+          // reads (e.g. it pulled a driver ID out of driverProfile).
+          const rawBody = await invokeAgentCore({ prompt: message, history, activeShipment, driverProfile });
+          const replyText = extractAgentReplyText(rawBody);
+          if (replyText) {
+            return res.json({ text: replyText });
           }
+          console.warn('Bedrock AgentCore returned a response we could not parse, falling back to canned responses. Raw body:', rawBody);
+        } catch (err) {
+          console.error('Bedrock AgentCore invocation failed, falling back to canned responses:', err);
         }
-        contents.push({
-          role: 'user',
-          parts: [{ text: message }],
-        });
-
-        const response = await ai.models.generateContent({
-          model: 'gemini-3.6-flash',
-          contents,
-          config: {
-            systemInstruction,
-            temperature: 0.7,
-          },
-        });
-
-        return res.json({ text: response.text || 'Copy that, driver. How else can dispatch assist you today?' });
       }
 
-      // Fallback response if GEMINI_API_KEY is not configured
+      // Fallback response if Bedrock AgentCore is not configured or unavailable
       const lowerMsg = (message || '').toLowerCase();
       let responseText = `Copy that, driver! I'm FleetPulse Dispatch Co-pilot. `;
       let actionObj = null;
