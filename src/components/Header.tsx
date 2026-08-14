@@ -6,7 +6,6 @@ interface HeaderProps {
   activeTab: 'active' | 'loads' | 'history' | 'profile';
   setActiveTab: (tab: 'active' | 'loads' | 'history' | 'profile') => void;
   driverProfile: DriverProfile;
-  setDriverProfile: React.Dispatch<React.SetStateAction<DriverProfile>>;
   activeShipment: Shipment | null;
   unresolvedIssuesCount: number;
   availableLoadsCount: number;
@@ -17,28 +16,18 @@ export const Header: React.FC<HeaderProps> = ({
   activeTab,
   setActiveTab,
   driverProfile,
-  setDriverProfile,
   activeShipment,
   unresolvedIssuesCount,
   availableLoadsCount,
   onLogout,
 }) => {
-  const handleDutyStatusChange = (status: DriverProfile['dutyStatus']) => {
-    setDriverProfile((prev) => ({
-      ...prev,
-      dutyStatus: status,
-    }));
-  };
-
-  const getDutyBadgeColor = (status: DriverProfile['dutyStatus']) => {
+  const getDutyBadgeColor = (status: DriverProfile['status']) => {
     switch (status) {
-      case 'DRIVING':
+      case 'active':
         return 'bg-emerald-100 text-emerald-900 border-emerald-300';
-      case 'ON_DUTY':
-        return 'bg-blue-100 text-blue-900 border-blue-300';
-      case 'ON_BREAK':
+      case 'off_duty':
         return 'bg-amber-100 text-amber-900 border-amber-300';
-      case 'OFF_DUTY':
+      case 'inactive':
         return 'bg-slate-200 text-slate-800 border-slate-300';
     }
   };
@@ -73,13 +62,13 @@ export const Header: React.FC<HeaderProps> = ({
                 <span className="text-indigo-300">|</span>
                 <span className="text-slate-700 font-medium flex items-center gap-1">
                   <MapPin className="w-3.5 h-3.5 text-indigo-500" />
-                  {activeShipment.pickupLocation.cityState} → {activeShipment.deliveryLocation.cityState}
+                  {activeShipment.originLabel} → {activeShipment.destinationFacility.name}
                 </span>
               </div>
               <div className="flex items-center space-x-2 text-xs border-l border-indigo-200 pl-3">
                 <Clock className="w-3.5 h-3.5 text-emerald-600" />
                 <span className="text-slate-700">
-                  ETA: <span className="font-bold text-slate-900">{activeShipment.deliveryLocation.updatedEta || activeShipment.deliveryLocation.scheduledEta}</span>
+                  ETA: <span className="font-bold text-slate-900">{activeShipment.latestEtaUpdate?.declaredEta || activeShipment.plannedEta}</span>
                 </span>
               </div>
               {unresolvedIssuesCount > 0 && (
@@ -91,38 +80,23 @@ export const Header: React.FC<HeaderProps> = ({
             </div>
           )}
 
-          {/* Driver Duty Status Controls & Driver Info */}
+          {/* Driver Duty Status & Driver Info */}
           <div className="flex items-center space-x-3">
             <div className="relative group">
               <div className="flex items-center space-x-2 bg-slate-100 rounded-xl p-1 border border-slate-200">
-                <span className="text-xs font-semibold text-slate-600 px-2 hidden sm:inline-block">Duty:</span>
-                <select
-                  value={driverProfile.dutyStatus}
-                  onChange={(e) => handleDutyStatusChange(e.target.value as DriverProfile['dutyStatus'])}
-                  className={`text-xs font-bold px-2.5 py-1 rounded-lg border appearance-none cursor-pointer focus:outline-none ${getDutyBadgeColor(
-                    driverProfile.dutyStatus
-                  )}`}
-                  id="duty-status-select"
+                <span className="text-xs font-semibold text-slate-600 px-2 hidden sm:inline-block">Status:</span>
+                <span
+                  className={`text-xs font-bold px-2.5 py-1 rounded-lg border ${getDutyBadgeColor(driverProfile.status)}`}
+                  id="duty-status-badge"
                 >
-                  <option value="DRIVING" className="bg-white text-slate-900">
-                    🟢 DRIVING
-                  </option>
-                  <option value="ON_DUTY" className="bg-white text-slate-900">
-                    🔵 ON DUTY
-                  </option>
-                  <option value="ON_BREAK" className="bg-white text-slate-900">
-                    🟡 ON BREAK
-                  </option>
-                  <option value="OFF_DUTY" className="bg-white text-slate-900">
-                    ⚪ OFF DUTY
-                  </option>
-                </select>
+                  {driverProfile.status.replace('_', ' ').toUpperCase()}
+                </span>
               </div>
             </div>
 
             {/* Driver Badge & Logout */}
             <div className="flex items-center space-x-2">
-              <div 
+              <div
                 onClick={() => setActiveTab('profile')}
                 className="flex items-center space-x-2 bg-slate-100 hover:bg-slate-200/80 transition-colors p-1.5 rounded-xl border border-slate-200 cursor-pointer"
                 title="View Driver Profile & Settings"
@@ -132,7 +106,7 @@ export const Header: React.FC<HeaderProps> = ({
                 </div>
                 <div className="text-left hidden md:block">
                   <div className="text-xs font-bold text-slate-900 leading-tight">{driverProfile.name}</div>
-                  <div className="text-[10px] text-slate-500 font-mono font-medium">{driverProfile.assignedTruck.unitNumber}</div>
+                  <div className="text-[10px] text-slate-500 font-mono font-medium">{driverProfile.assignedVehicle?.id ?? driverProfile.id}</div>
                 </div>
               </div>
 
@@ -193,7 +167,7 @@ export const Header: React.FC<HeaderProps> = ({
             }`}
           >
             <PackageCheck className="w-4 h-4" />
-            <span>Accept New Loads</span>
+            <span>Dock Appointment</span>
             {availableLoadsCount > 0 && (
               <span
                 className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
@@ -202,7 +176,7 @@ export const Header: React.FC<HeaderProps> = ({
                     : 'bg-emerald-100 text-emerald-800 border border-emerald-200'
                 }`}
               >
-                {availableLoadsCount} available
+                {availableLoadsCount} open slots
               </span>
             )}
           </button>
@@ -230,7 +204,7 @@ export const Header: React.FC<HeaderProps> = ({
             }`}
           >
             <User className="w-4 h-4" />
-            <span>Profile & Truck Settings</span>
+            <span>Driver Profile</span>
           </button>
 
         </div>

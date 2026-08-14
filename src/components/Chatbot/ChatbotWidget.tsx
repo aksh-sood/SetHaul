@@ -17,7 +17,7 @@ import {
   Zap,
   MapPin
 } from 'lucide-react';
-import { Shipment, DriverProfile, IssueReport, IssueCategory, IssueSeverity } from '../../types';
+import { Shipment, DriverProfile, IssueReport, ExceptionType } from '../../types';
 
 interface Message {
   id: string;
@@ -26,11 +26,10 @@ interface Message {
   timestamp: string;
   actionCard?: {
     actionType: string;
-    category: IssueCategory;
+    category: ExceptionType;
     title: string;
     description: string;
     estimatedDelayMinutes: number;
-    severity: IssueSeverity;
     suggestedNewEta: string;
     executed?: boolean;
   };
@@ -39,7 +38,7 @@ interface Message {
 interface ChatbotWidgetProps {
   activeShipment: Shipment | null;
   driverProfile: DriverProfile;
-  onSubmitIssue: (issueData: Omit<IssueReport, 'id' | 'timestamp' | 'resolved'>) => void;
+  onSubmitIssue: (issueData: Pick<IssueReport, 'shipmentId' | 'category' | 'estimatedDelayMinutes'>) => void;
   onOpenIssueModal: () => void;
 }
 
@@ -56,13 +55,13 @@ export const ChatbotWidget: React.FC<ChatbotWidgetProps> = ({
 
   // Quick Reschedule Form State
   const [rescheduleMinutes, setRescheduleMinutes] = useState(45);
-  const [rescheduleReasonCategory, setRescheduleReasonCategory] = useState<IssueCategory>('TRAFFIC');
+  const [rescheduleReasonCategory, setRescheduleReasonCategory] = useState<ExceptionType>('traffic_delay');
   const [rescheduleNotes, setRescheduleNotes] = useState('');
 
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
 
   const initialWelcomeText = activeShipment
-    ? `Hello ${driverProfile.name.split(' ')[0]}! 🚚 I'm your FleetPulse AI Dispatch Co-Pilot. You are currently assigned to Shipment **${activeShipment.id}** bound for **${activeShipment.deliveryLocation.facilityName}**. How can I assist you with route updates or rescheduling today?`
+    ? `Hello ${driverProfile.name.split(' ')[0]}! 🚚 I'm your FleetPulse AI Dispatch Co-Pilot. You are currently assigned to Shipment **${activeShipment.id}** bound for **${activeShipment.destinationFacility.name}**. How can I assist you with route updates or rescheduling today?`
     : `Hello ${driverProfile.name.split(' ')[0]}! 🚚 I'm your FleetPulse AI Dispatch Assistant. You currently have no active shipment. How can I assist you with available loads, route questions, or dispatch support?`;
 
   const [messages, setMessages] = useState<Message[]>([
@@ -176,11 +175,7 @@ export const ChatbotWidget: React.FC<ChatbotWidgetProps> = ({
     // Submit issue to active shipment state in App.tsx
     onSubmitIssue({
       shipmentId: activeShipment.id,
-      category: actionCard.category || 'TRAFFIC',
-      title: actionCard.title || 'Reschedule / Delay Request',
-      description: `${actionCard.description} (Submitted via AI Chatbot)`,
-      severity: actionCard.severity || 'MEDIUM',
-      location: activeShipment.currentLocationName || 'En route',
+      category: actionCard.category || 'other',
       estimatedDelayMinutes: actionCard.estimatedDelayMinutes || 30,
     });
 
@@ -315,7 +310,7 @@ export const ChatbotWidget: React.FC<ChatbotWidgetProps> = ({
                 <Truck className="w-3.5 h-3.5 text-indigo-600 flex-shrink-0" />
                 <span className="font-bold text-slate-900">{activeShipment.id}</span>
                 <span className="text-slate-500 text-[11px] truncate">
-                  → {activeShipment.deliveryLocation.facilityName} ({activeShipment.deliveryLocation.cityState})
+                  → {activeShipment.destinationFacility.name} ({activeShipment.destinationFacility.city})
                 </span>
               </div>
               <span className="bg-indigo-50 text-indigo-800 border border-indigo-200 px-2 py-0.5 rounded-lg text-[10px] font-bold shrink-0 ml-1">
@@ -435,14 +430,14 @@ export const ChatbotWidget: React.FC<ChatbotWidgetProps> = ({
                     <label className="text-[10px] text-slate-600 block mb-0.5 font-bold uppercase">Reason Category</label>
                     <select
                       value={rescheduleReasonCategory}
-                      onChange={(e) => setRescheduleReasonCategory(e.target.value as IssueCategory)}
+                      onChange={(e) => setRescheduleReasonCategory(e.target.value as ExceptionType)}
                       className="w-full bg-white border border-slate-300 text-slate-900 rounded-lg px-2 py-1 text-xs focus:ring-1 focus:ring-indigo-500 outline-none"
                     >
-                      <option value="TRAFFIC">Traffic Congestion</option>
-                      <option value="DOCK_DELAY">Dock Queue Delay</option>
-                      <option value="BREAKDOWN">Vehicle / Mechanical</option>
-                      <option value="WEATHER">Severe Weather</option>
-                      <option value="OTHER">Other / HOS Rest</option>
+                      <option value="traffic_delay">Traffic Congestion</option>
+                      <option value="late_departure">Late Departure</option>
+                      <option value="breakdown">Vehicle / Mechanical</option>
+                      <option value="accident">Accident / Collision</option>
+                      <option value="other">Other / HOS Rest</option>
                     </select>
                   </div>
 

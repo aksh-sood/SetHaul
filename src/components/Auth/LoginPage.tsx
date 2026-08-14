@@ -1,157 +1,21 @@
 import React, { useState } from 'react';
 import { Truck, ShieldCheck, Lock, User, Eye, EyeOff, AlertCircle, ArrowRight, CheckCircle2, KeyRound } from 'lucide-react';
-import { DriverProfile } from '../../types';
 
 interface LoginPageProps {
-  onLogin: (driverId: string, profile?: DriverProfile) => void;
+  onLogin: (driverId: string) => void;
 }
 
-export const DEMO_DRIVERS: {
-  id: string;
-  name: string;
-  truck: string;
-  type: string;
-  rating: number;
-  miles: string;
-  password: string;
-  profile: DriverProfile;
-}[] = [
-  {
-    id: 'DRV-4029',
-    name: 'Marcus Vance',
-    truck: 'TRK-7082',
-    type: 'Refrigerated Semi (Cold Chain)',
-    rating: 4.92,
-    miles: '142,850 mi',
-    password: 'password123',
-    profile: {
-      id: 'DRV-4029',
-      name: 'Marcus Vance',
-      email: 'marcus.vance@fleetpulse.com',
-      phone: '+1 (404) 555-0182',
-      cdlNumber: 'CDL-GA-90284711',
-      cdlState: 'GA (Class A Commercial)',
-      cdlExpiration: '2028-11-15',
-      endorsements: ['HazMat (H)', 'Refrigerated Transport (X)', 'Double/Triple Trailers (T)'],
-      totalMilesDriven: 142850,
-      onTimeDeliveryRate: 98.6,
-      overallRating: 4.92,
-      dutyStatus: 'DRIVING',
-      shiftHoursRemaining: 7.5,
-      assignedTruck: {
-        unitNumber: 'TRK-7082',
-        model: '2024 Freightliner Cascadia 126',
-        truckType: "53' Semi Refrigerated Box (Thermo King S-600)",
-        plateNumber: '7X-4892 (GA)',
-        fuelLevelPercent: 78,
-        defLevelPercent: 85,
-        lastServiceDate: '2026-07-28',
-        nextServiceDueMiles: 4200,
-        maxPayloadCapacityLbs: 45000,
-        odometerMiles: 84320,
-      },
-      notifications: {
-        smsIssueAlerts: true,
-        pushDispatchOffers: true,
-        routeTrafficUpdates: true,
-        weatherWarnings: true,
-        shiftHourReminders: true,
-        emailWeeklySummaries: false,
-      },
-    },
-  },
-  {
-    id: 'DRV-5102',
-    name: 'Sarah Jenkins',
-    truck: 'TRK-3340',
-    type: '53 Dry Van Regional Express',
-    rating: 4.98,
-    miles: '210,400 mi',
-    password: 'password123',
-    profile: {
-      id: 'DRV-5102',
-      name: 'Sarah Jenkins',
-      email: 'sarah.jenkins@fleetpulse.com',
-      phone: '+1 (312) 555-0199',
-      cdlNumber: 'CDL-IL-77182902',
-      cdlState: 'IL (Class A Commercial)',
-      cdlExpiration: '2029-04-20',
-      endorsements: ['Tanker (N)', 'Doubles/Triples (T)'],
-      totalMilesDriven: 210400,
-      onTimeDeliveryRate: 99.2,
-      overallRating: 4.98,
-      dutyStatus: 'ON_DUTY',
-      shiftHoursRemaining: 9.0,
-      assignedTruck: {
-        unitNumber: 'TRK-3340',
-        model: '2025 Kenworth T680 NextGen',
-        truckType: "53' High-Cube Dry Van",
-        plateNumber: 'IL-9021',
-        fuelLevelPercent: 92,
-        defLevelPercent: 90,
-        lastServiceDate: '2026-08-02',
-        nextServiceDueMiles: 6500,
-        maxPayloadCapacityLbs: 48000,
-        odometerMiles: 45210,
-      },
-      notifications: {
-        smsIssueAlerts: true,
-        pushDispatchOffers: true,
-        routeTrafficUpdates: true,
-        weatherWarnings: true,
-        shiftHourReminders: true,
-        emailWeeklySummaries: true,
-      },
-    },
-  },
-  {
-    id: 'DRV-8821',
-    name: 'David Rodriguez',
-    truck: 'TRK-9012',
-    type: 'Step Deck & Heavy Flatbed',
-    rating: 4.89,
-    miles: '185,200 mi',
-    password: 'password123',
-    profile: {
-      id: 'DRV-8821',
-      name: 'David Rodriguez',
-      email: 'david.rodriguez@fleetpulse.com',
-      phone: '+1 (214) 555-0144',
-      cdlNumber: 'CDL-TX-44109822',
-      cdlState: 'TX (Class A Commercial)',
-      cdlExpiration: '2027-09-10',
-      endorsements: ['Oversized/Heavy Haul', 'HazMat (H)'],
-      totalMilesDriven: 185200,
-      onTimeDeliveryRate: 97.9,
-      overallRating: 4.89,
-      dutyStatus: 'ON_BREAK',
-      shiftHoursRemaining: 5.2,
-      assignedTruck: {
-        unitNumber: 'TRK-9012',
-        model: '2024 Peterbilt 579 UltraLoft',
-        truckType: "48' Drop-Deck Heavy Flatbed",
-        plateNumber: 'TX-8831',
-        fuelLevelPercent: 64,
-        defLevelPercent: 70,
-        lastServiceDate: '2026-07-15',
-        nextServiceDueMiles: 1800,
-        maxPayloadCapacityLbs: 52000,
-        odometerMiles: 112040,
-      },
-      notifications: {
-        smsIssueAlerts: true,
-        pushDispatchOffers: true,
-        routeTrafficUpdates: true,
-        weatherWarnings: true,
-        shiftHourReminders: false,
-        emailWeeklySummaries: false,
-      },
-    },
-  },
+// Login itself stays a mocked/demo gate (no real password check) — but the
+// IDs below are real driver_ids in the SetuHaul DB, so once "logged in" the
+// app fetches that driver's actual profile/shipment data live.
+export const DEMO_DRIVERS: { id: string; name: string; homeBase: string; password: string }[] = [
+  { id: 'DRV-101', name: 'Ramesh Kumar', homeBase: 'Bengaluru', password: 'password123' },
+  { id: 'DRV-102', name: 'Suresh Patel', homeBase: 'Bengaluru', password: 'password123' },
+  { id: 'DRV-103', name: 'Anil Sharma', homeBase: 'Bengaluru', password: 'password123' },
 ];
 
 export const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
-  const [driverId, setDriverId] = useState('DRV-4029');
+  const [driverId, setDriverId] = useState('DRV-101');
   const [password, setPassword] = useState('password123');
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
@@ -166,7 +30,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
     const cleanPass = password.trim();
 
     if (!cleanId) {
-      setErrorMsg('Please enter your assigned Driver ID (e.g. DRV-4029).');
+      setErrorMsg('Please enter your assigned Driver ID (e.g. DRV-101).');
       return;
     }
 
@@ -187,13 +51,14 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
           setIsLoading(false);
           return;
         }
-        onLogin(matchedDriver.id, matchedDriver.profile);
+        onLogin(matchedDriver.id);
       } else {
-        // Allow login with any DRV-XXXX ID for flexibility
+        // Allow login with any DRV-XXX ID for flexibility — the app will
+        // simply fail to find a matching driver in the DB after login.
         if (cleanId.startsWith('DRV-') || cleanId.length >= 4) {
           onLogin(cleanId);
         } else {
-          setErrorMsg('Invalid Driver ID format. Valid formats start with "DRV-" (e.g. DRV-4029).');
+          setErrorMsg('Invalid Driver ID format. Valid formats start with "DRV-" (e.g. DRV-101).');
           setIsLoading(false);
         }
       }
@@ -269,7 +134,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
                   type="text"
                   value={driverId}
                   onChange={(e) => setDriverId(e.target.value)}
-                  placeholder="e.g. DRV-4029"
+                  placeholder="e.g. DRV-101"
                   required
                   className="block w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm font-semibold text-slate-900 placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all"
                 />
@@ -379,7 +244,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
                             {demo.id}
                           </span>
                         </div>
-                        <p className="text-[11px] text-slate-500 font-medium">{demo.type}</p>
+                        <p className="text-[11px] text-slate-500 font-medium">Home base: {demo.homeBase}</p>
                       </div>
                     </div>
 

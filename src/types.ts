@@ -1,40 +1,21 @@
-export type ShipmentStatus = 
-  | 'DISPATCHED'
-  | 'ARRIVED_PICKUP'
-  | 'LOADING'
-  | 'IN_TRANSIT'
-  | 'ARRIVED_DELIVERY'
-  | 'UNLOADING'
-  | 'DELIVERED'
-  | 'DELAYED'
-  | 'CANCELLED';
-
-export type IssueCategory = 
-  | 'TRAFFIC'
-  | 'BREAKDOWN'
-  | 'DOCK_DELAY'
-  | 'WEATHER'
-  | 'GATE_ACCESS'
-  | 'INSPECTION'
-  | 'CUSTOMER_UNAVAILABLE'
-  | 'OTHER';
-
-export type IssueSeverity = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+// These unions mirror the real Postgres enums in the SetuHaul Supabase
+// project exactly (confirmed via the PostgREST OpenAPI schema) — do not
+// add values here without adding them to the DB enum first.
+export type ShipmentStatus = 'planned' | 'in_transit' | 'arrived' | 'completed' | 'cancelled';
+export type ExceptionType = 'breakdown' | 'traffic_delay' | 'late_departure' | 'accident' | 'other';
+export type ExceptionStatus = 'open' | 'awaiting_driver' | 'awaiting_facility' | 'resolved' | 'escalated' | 'cancelled';
+export type DriverStatus = 'active' | 'off_duty' | 'inactive';
+export type VehicleStatus = 'active' | 'maintenance' | 'inactive';
+export type SlotStatus = 'available' | 'held' | 'requested' | 'confirmed' | 'expired' | 'released' | 'blocked' | 'booked';
+export type AppointmentStatus = 'pending' | 'confirmed' | 'cancelled' | 'superseded';
 
 export interface IssueReport {
   id: string;
   shipmentId: string;
-  category: IssueCategory;
-  title: string;
-  description: string;
-  severity: IssueSeverity;
-  timestamp: string;
-  location: string;
-  photoUrl?: string;
+  category: ExceptionType;
   estimatedDelayMinutes: number;
-  resolved: boolean;
-  resolvedAt?: string;
-  resolutionNotes?: string;
+  timestamp: string;
+  status: ExceptionStatus;
 }
 
 export interface TimelineEvent {
@@ -50,129 +31,80 @@ export interface TimelineEvent {
 
 export interface Waypoint {
   name: string;
-  type: 'PICKUP' | 'REST_STOP' | 'INSPECTION' | 'DELIVERY';
-  address: string;
-  estimatedArrival: string;
+  type: 'PICKUP' | 'DELIVERY';
+  estimatedArrival?: string;
   actualArrival?: string;
   completed: boolean;
-  coordinates: { lat: number; lng: number };
+}
+
+export interface VehicleInfo {
+  id: string; // vehicle_id
+  type: string; // vehicle_type
+  lengthFt: number;
+  refrigerationRequired: boolean;
+  status: VehicleStatus;
+}
+
+export interface AppointmentInfo {
+  id: string; // appointment_id
+  slotId: string;
+  status: AppointmentStatus;
+  startTime: string;
+  endTime: string;
 }
 
 export interface Shipment {
-  id: string; // e.g. SHP-89241
-  driverId: string; // e.g. DRV-4029
-  driverName: string;
-  truckType: string; // e.g. 53' Refrigerated Semi
-  truckNumber: string; // e.g. TRK-7082
-  licensePlate: string; // e.g. 7X-4892
-  
-  // Locations
-  pickupLocation: {
-    facilityName: string;
-    address: string;
-    cityState: string;
-    contactPhone: string;
-    scheduledTime: string;
-    actualTime?: string;
-  };
-  deliveryLocation: {
-    facilityName: string;
-    address: string;
-    cityState: string;
-    contactPhone: string;
-    scheduledEta: string;
-    updatedEta?: string;
+  id: string; // shipment_id, e.g. SHP-1001
+  driverId: string; // driver_id, e.g. DRV-101
+  vehicle: VehicleInfo;
+
+  originLabel: string; // raw origin_id (a hub label, not a facilities row)
+  destinationFacility: {
+    id: string; // facility_id
+    name: string;
+    city: string;
   };
 
-  // Cargo specs
-  cargoDescription: string;
-  cargoWeight: string; // e.g. 42,000 lbs
-  temperatureRequirement?: string; // e.g. -10°F Cold Chain
-  bolNumber: string; // Bill of Lading
-  payoutAmount: number; // e.g. 2450
+  productClass: string;
+  priority: number;
+  plannedEta: string; // ISO timestamp
+  expectedUnloadMinutes: number;
 
-  // Route metrics
-  totalDistanceMiles: number;
-  remainingDistanceMiles: number;
-  currentProgressPercent: number;
-  currentSpeedMph?: number;
-  currentLocationName: string;
-
-  // Status & Issues
   status: ShipmentStatus;
-  statusReason?: string;
-  timeline: TimelineEvent[];
-  issues: IssueReport[];
+  currentProgressPercent: number; // discrete stage (0/33/50/75/100), not GPS-derived
+  appointment: AppointmentInfo | null;
+  latestEtaUpdate: {
+    declaredEta: string;
+    sourceType: 'planned' | 'driver' | 'ops';
+    confidenceNote?: string;
+  } | null;
+
   waypoints: Waypoint[];
+  issues: IssueReport[];
+  timeline: TimelineEvent[];
 
-  // Proof of delivery for history
-  podDetails?: {
-    receivedByPerson?: string;
-    signatureTimestamp?: string;
-    notes?: string;
-    rating?: number;
-  };
-
-  completedAt?: string;
+  createdAt: string;
+  completedAt?: string; // facility_checkins.completed_at, only set once status='completed'
 }
 
-export interface AvailableLoad {
-  id: string;
-  originCity: string;
-  originFacility: string;
-  originAddress: string;
-  destinationCity: string;
-  destinationFacility: string;
-  destinationAddress: string;
-  pickupWindowStart: string;
-  pickupWindowEnd: string;
-  deliveryEta: string;
-  cargoType: string;
-  weightLbs: number;
-  truckTypeRequired: string;
-  distanceMiles: number;
-  payoutUsd: number;
-  ratePerMileUsd: number;
-  urgency: 'NORMAL' | 'URGENT' | 'HIGH_PAY';
-  specialInstructions?: string;
+export interface AppointmentSlotOption {
+  slotId: string;
+  dockId: string;
+  dockName: string;
+  facilityId: string;
+  startTime: string;
+  endTime: string;
+  capacityUnits: number;
+  slotStatus: SlotStatus;
+  heldUntil?: string | null;
 }
 
 export interface DriverProfile {
-  id: string;
+  id: string; // driver_id
   name: string;
-  email: string;
   phone: string;
-  cdlNumber: string;
-  cdlState: string;
-  cdlExpiration: string;
-  endorsements: string[];
-  totalMilesDriven: number;
-  onTimeDeliveryRate: number; // e.g. 98.4%
-  overallRating: number; // e.g. 4.9
-  dutyStatus: 'ON_DUTY' | 'DRIVING' | 'ON_BREAK' | 'OFF_DUTY';
-  shiftHoursRemaining: number;
-  
-  // Truck Specs
-  assignedTruck: {
-    unitNumber: string;
-    model: string; // e.g. 2024 Freightliner Cascadia
-    truckType: string;
-    plateNumber: string;
-    fuelLevelPercent: number;
-    defLevelPercent: number;
-    lastServiceDate: string;
-    nextServiceDueMiles: number;
-    maxPayloadCapacityLbs: number;
-    odometerMiles: number;
-  };
-
-  // Notification Preferences
-  notifications: {
-    smsIssueAlerts: boolean;
-    pushDispatchOffers: boolean;
-    routeTrafficUpdates: boolean;
-    weatherWarnings: boolean;
-    shiftHourReminders: boolean;
-    emailWeeklySummaries: boolean;
-  };
+  carrierId: string;
+  homeBase: string;
+  status: DriverStatus;
+  assignedVehicle: VehicleInfo | null;
 }
