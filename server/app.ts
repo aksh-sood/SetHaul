@@ -1,6 +1,6 @@
 import express, { Express } from 'express';
-import { registerRoutes } from './routes';
-import { getBedrockAgentCoreClient, invokeAgentCore, extractAgentReplyText } from './bedrockAgentCore';
+import { registerRoutes } from './routes.js';
+import { getBedrockAgentCoreClient, invokeAgentCore, extractAgentReplyText } from './bedrockAgentCore.js';
 
 export function createApp(): Express {
   const app = express();

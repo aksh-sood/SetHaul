@@ -1,5 +1,5 @@
 import 'dotenv/config';
-import { createApp } from '../server/app';
+import { createApp } from '../server/app.js';
 
 // Vercel Serverless Function entrypoint — wraps the Express app so every
 // /api/* request (see vercel.json rewrite) is handled by the same routes
